@@ -251,12 +251,6 @@ function prepareTerminal(term) {
 	term.on('mouseup', function(mouse) {
 		term.set('drag', false);
 	});
-	term.on('mousemove', function(mouse) {
-		if (term.get('drag', false)) {
-			mouse.action = 'mouseup';
-			term.emit('mouseup', mouse);
-		}
-	});
 	term.on('wheelup', function(mouse) {
 		if (!term.term.mouseEvents) {
 			term.scroll(-2);
