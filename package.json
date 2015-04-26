@@ -1,0 +1,25 @@
+{
+  "name": "tew",
+  "version": "0.1.0",
+  "description": "Terminal Window Manager",
+  "preferGlobal": true,
+  "main": "./main.js",
+  "bin": {
+    "tew": "./main.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thormme/tew.git"
+  },
+  "bugs": "https://github.com/thormme/tew/issues",
+  "author": "Michael Schroder",
+  "license": "MIT",
+  "dependencies": {
+    "blessed": "0.1.5",
+    "term.js": "0.0.4",
+    "pty.js": "0.2.7-1"
+  },
+  "devDependencies": {
+    "npm": "^2.7.4"
+  }
+}
