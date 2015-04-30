@@ -24,6 +24,7 @@ screen = blessed.screen({
 var menu = blessed.listbar({
 	parent: screen,
 	screenKeys: false,
+	dockBorders: true,
 	left: 0,
 	top: 0,
 	height: 1,
@@ -40,34 +41,45 @@ var menu = blessed.listbar({
 	}
 });
 
-function createTerminal() {
-	/*var term = blessed.terminal({
-		parent: screen,
-		cursor: 'block',
-		cursorBlink: true,
-		screenKeys: false,
-		left: 0,
-		top: 2,
-		bottom: 2,
-		width: '40%',
-		border: 'line',
-		scrollable: true,
-		style: {
-			fg: 'default',
-			bg: 'default',
-			scrollbar: {
-				bg: 'blue'
-			},
-			focus: {
-				border: {
-					fg: 'green'
-				}
+var desktop = blessed.box({
+	parent: screen,
+	left: 0,
+	top: 1,
+	bottom: 0,
+	width: '100%'
+});
+	
+/*var mouseBox = blessed.box({
+	parent: screen,
+	cursorBlink: true,
+	screenKeys: true,
+	keys: true,
+	right: 0,
+	top: 0,
+	bottom: 0,
+	width: '30%',
+	border: 'line',
+	scrollable: true,
+	scrollbar: {
+		ch: ' '
+	},
+	style: {
+		fg: 'default',
+		bg: 'default',
+		scrollbar: {
+			bg: 'blue'
+		},
+		focus: {
+			border: {
+				fg: 'green'
 			}
 		}
-	});*/
-	
+	}
+});*/
+
+function createTerminal() {
 	var term = blessed.terminal({
-		parent: screen,
+		parent: desktop,
 		cursorBlink: true,
 		screenKeys: true,
 		keys: true,
@@ -107,11 +119,16 @@ function prepareTerminal(term) {
 			width: term.width,
 			height: term.height,
 		});
-		term.setLabel("maximize " + term.top);
+		term.setLabel("maximize " + rect.height);
 		term.top = rect.top;
 		term.left = rect.left;
 		term.width = rect.width;
-		term.height = rect.height;
+		if (rect.bottom !== undefined) {
+			term.height = undefined;
+			term.bottom = rect.bottom;
+		} else {
+			term.height = rect.height;
+		}
 		screen.render();
 	}
 	function restore(rect) {
@@ -135,20 +152,29 @@ function prepareTerminal(term) {
 		}
 	});
 	screen.on('mouse', function(mouse) {
+		if (typeof mouseBox !== 'undefined') {
+			if (mouseBox.content.lastIndexOf("mousemove\n") > mouseBox.content.length - 20 && mouse.action == "mousemove") {
+				mouseBox.content += "-";
+			} else {
+				mouseBox.content += mouse.action + "\n";
+			}
+			mouseBox.setScrollPerc(100);
+			mouseBox.setFront();
+		}
 		if (term.get('drag', false) == 'resize') {
 			term.setLabel("resize");
-			term.width = mouse.x - term.left + 1;
-			term.height = mouse.y - term.top + 1;
+			term.width = Math.max(mouse.x - term.aleft + 1, 2);
+			term.height = Math.max(mouse.y - term.atop + 1, 2);
 			screen.render();
 		}
 		if (term.get('drag', false) == 'move' && mouse.action !== 'mouseup') {
 			term.setLabel("move");
 			var dragStart = term.get('dragStart');
-			term.left = mouse.x - dragStart.mouseX + dragStart.left;
-			term.top = mouse.y - dragStart.mouseY + dragStart.top;
+			term.aleft = mouse.x - dragStart.mouseX + dragStart.left;
+			term.atop = mouse.y - dragStart.mouseY + dragStart.top;
 			screen.render();
 		}
-		if (mouse.action === 'mouseup') {
+		if (term.get('drag', false) == 'move' && mouse.action === 'mouseup') {
 			if (term.get('maximized', false)) {
 				if (term.top > 1) {
 					term.set('maximized', false);
@@ -169,45 +195,47 @@ function prepareTerminal(term) {
 				if (mouse.x == 0) {
 					maximize({
 						left: 0,
-						top: 1,
-						width: Math.floor(screen.width / 2),
-						height: screen.height - 1
+						top: 0,
+						width: "50%",
+						height: '100%'
 					});
 				}
 				if (mouse.x >= screen.width - 1) {
 					maximize({
-						left: Math.floor(screen.width / 2),
-						top: 1,
-						width: screen.width - Math.floor(screen.width / 2),
-						height: screen.height - 1
+						left: "50%",
+						top: 0,
+						width: "50%",
+						height: '100%'
 					});
 				}
 				if (mouse.y <= 0) {
 					maximize({
 						left: 0,
-						top: 1,
-						width: screen.width,
-						height: screen.height - 1
+						top: 0,
+						width: "100%",
+						height: '100%'
 					});
 				}
 			}
+		}
+		if (term.get('drag', false) != false && mouse.action === 'mouseup') {
 			term.set('drag', false);
 		}
 	});
 	term.on('mousedown', function(mouse) {
-		if (mouse.x == term.left + term.width - 1 &&
-				mouse.y == term.top + term.height - 1 &&
+		if (mouse.x == term.aleft + term.width - 1 &&
+				mouse.y == term.atop + term.height - 1 &&
 				term.get('drag', false) != 'resize') {
 			term.set('drag', 'resize');
 		}
-		if (mouse.y == term.top &&
+		if (mouse.y == term.atop &&
 				term.get('drag', false) != 'move') {
 			term.set('drag', 'move');
 			term.set('dragStart', {
 				mouseX: mouse.x,
 				mouseY: mouse.y,
-				left: term.left,
-				top: term.top,
+				left: term.aleft,
+				top: term.atop,
 				width: term.width,
 				height: term.height
 			});
@@ -217,15 +245,15 @@ function prepareTerminal(term) {
 		term.setFront();
 	});
 	term.on('click', function(mouse) {
-		if (mouse.y == term.top) {
+		if (mouse.y == term.atop) {
 			if (Date.now() - lastClickTime < doubleClickTimeout && lastClickPosition.x == mouse.x && lastClickPosition.y == mouse.y) {
 				if (!term.get('maximized', false)) {
 					term.set('drag', false);
 					maximize({
 						left: 0,
-						top: 1,
-						width: screen.width,
-						height: screen.height - 1
+						top: 0,
+						width: "100%",
+						height: '100%'
 					});
 				} else {
 					term.set('maximized', false);
@@ -244,12 +272,9 @@ function prepareTerminal(term) {
 		}
 	});
 	term.on('render', function() {
-		screen.fillRegion(this.sattr(this.style), '+',
-				term.left + term.width - 1, term.left + term.width,
-				term.top + term.height - 1, term.top + term.height);
-	});
-	term.on('mouseup', function(mouse) {
-		term.set('drag', false);
+		screen.fillRegion(this.sattr(this.style), '┛',
+				term.aleft + term.width - 1, term.aleft + term.width,
+				term.atop + term.height - 1, term.atop + term.height);
 	});
 	term.on('wheelup', function(mouse) {
 		if (!term.term.mouseEvents) {
